@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Snake</title>
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Snake">
+  <meta name="twitter:image" content="lib/SnakeGame_Thumb.png">
+  <meta property="og:title" content="Snake">
+  <meta property="og:image" content="lib/SnakeGame_Thumb.png">
+  <style>
+    @font-face {
+      font-family: 'Modak';
+      src: url('lib/Modak-Regular.ttf') format('truetype');
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: url('lib/SnakeGameBKG.png') center center / cover no-repeat fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Modak', monospace;
+      color: #2d0055;
+    }
+    #header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 400px;
+      padding: 10px 16px;
+      margin-bottom: 8px;
+      border: 3px solid #7c3aed;
+      border-radius: 4px;
+      background: rgba(25, 0, 55, 0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 8px 32px rgba(45, 0, 85, 0.45);
+    }
+    #title { font-size: 1.1rem; letter-spacing: 4px; color: #e2d0ff; font-weight: bold; }
+    #score { font-size: 1rem; color: #ffd700; font-weight: bold; font-family: sans-serif; }
+    canvas {
+      border: 3px solid #7c3aed;
+      border-radius: 4px;
+      background: rgba(25, 0, 55, 0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 8px 32px rgba(45, 0, 85, 0.45);
+    }
+    #game-wrapper {
+      display: flex;
+      flex-direction: column;
+    }
+    #message {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: #2d0055;
+      font-weight: bold;
+      font-family: sans-serif;
+      text-shadow: 0 1px 4px rgba(255,255,255,0.6);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <div id="header">
+      <span id="title">SNAKE</span>
+      <span id="score">Score: 0</span>
+    </div>
+    <canvas id="canvas" width="400" height="400"></canvas>
+  </div>
+  <div id="message"></div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const messageEl = document.getElementById('message');
+
+    const tracks = [
+      new Audio('lib/Influencer-Vlog_AdobeStock_1900264953.wav'),
+      new Audio('lib/Soft-LoFi_AdobeStock_956583251.wav'),
+    ];
+    tracks.forEach(t => t.loop = true);
+    let currentTrack = null;
+
+    function playRandomTrack() {
+      if (currentTrack) { currentTrack.pause(); currentTrack.currentTime = 0; }
+      currentTrack = tracks[Math.floor(Math.random() * tracks.length)];
+      currentTrack.play().catch(() => {});
+    }
+
+    function stopMusic() {
+      if (currentTrack) { currentTrack.pause(); currentTrack.currentTime = 0; }
+    }
+
+    const GRID = 20;
+    const COLS = canvas.width / GRID;
+    const ROWS = canvas.height / GRID;
+
+    let snake, dir, nextDir, food, score, running, loopId;
+
+    function init() {
+      snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+      score = 0;
+      running = false;
+      scoreEl.textContent = 'Score: 0';
+      messageEl.textContent = '';
+      placeFood();
+      draw();
+    }
+
+    function placeFood() {
+      let pos;
+      do {
+        pos = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+      } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+      food = pos;
+    }
+
+    function gameLoop() {
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+      // Wall collision
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+        return gameOver();
+      }
+      // Self collision
+      if (snake.some(s => s.x === head.x && s.y === head.y)) {
+        return gameOver();
+      }
+
+      snake.unshift(head);
+
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        scoreEl.textContent = `Score: ${score}`;
+        placeFood();
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Food — bright gold circle
+      ctx.fillStyle = '#ffd700';
+      ctx.shadowColor = '#ff8c00';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(
+        food.x * GRID + GRID / 2,
+        food.y * GRID + GRID / 2,
+        GRID / 2 - 2, 0, Math.PI * 2
+      );
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Snake — light purple head fading to dark + transparent tail
+      snake.forEach((seg, i) => {
+        const t = snake.length > 1 ? i / (snake.length - 1) : 0;
+        const r = Math.round(74 + (10 - 74) * t);
+        const g = Math.round(222 + (60 - 222) * t);
+        const b = Math.round(128 + (30 - 128) * t);
+        const a = (1 - t * 0.4).toFixed(2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.fillRect(seg.x * GRID + 1, seg.y * GRID + 1, GRID - 2, GRID - 2);
+      });
+
+      // Start overlay
+      if (!running) {
+        ctx.fillStyle = 'rgba(25, 0, 55, 0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#e2d0ff';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Press any arrow key to start', canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    function gameOver() {
+      clearInterval(loopId);
+      stopMusic();
+      running = false;
+      messageEl.textContent = `Game over! Score: ${score} — Press arrow key to restart`;
+      ctx.fillStyle = 'rgba(45, 0, 85, 0.65)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '36px Modak, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+    }
+
+    function start() {
+      clearInterval(loopId);
+      init();
+      running = true;
+      messageEl.textContent = '';
+      playRandomTrack();
+      loopId = setInterval(gameLoop, 120);
+    }
+
+    document.addEventListener('keydown', e => {
+      const keys = {
+        ArrowUp:    { x: 0, y: -1 },
+        ArrowDown:  { x: 0, y:  1 },
+        ArrowLeft:  { x: -1, y: 0 },
+        ArrowRight: { x:  1, y: 0 },
+      };
+      const newDir = keys[e.key];
+      if (!newDir) return;
+      e.preventDefault();
+
+      if (!running) { start(); return; }
+
+      // Prevent reversing
+      if (newDir.x === -dir.x && newDir.y === -dir.y) return;
+      nextDir = newDir;
+    });
+
+    init();
+  </script>
+</body>
+</html>
